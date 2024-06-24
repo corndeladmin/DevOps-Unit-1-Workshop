@@ -26,7 +26,7 @@ acc_id=488559761265
 # Create or read the hidden file for the random string
 if [[ ! -f ".lambda_id" ]]; then
     echo "Creating hidden file with random ID for Lambda function"
-    echo $(LC_ALL=C head -c 1000 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 10) > .lambda_id
+    echo $(head -c 1000 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | head -c 10) > .lambda_id
 fi
 lambda_id=$(cat .lambda_id)
 
@@ -81,9 +81,6 @@ fi
 
 rm lambda_function.zip bootstrap
 
-# Attach the jq layer to our function so that it's available as a tool
-aws lambda update-function-configuration --function-name $function_name --layers arn:aws:lambda:eu-west-1:488559761265:layer:jq:2 --region $aws_region
-
 # Check if the API Gateway REST API already exists
 api_id=$(aws apigateway get-rest-apis --query "items[?name=='U1W Madlibs ${current_date}-${lambda_id}'].id" --output text)
 
@@ -109,6 +106,11 @@ if [[ -z "$api_id" ]]; then
     # Grant API Gateway permission to invoke the Lambda function
     aws lambda add-permission --function-name "$function_name" --statement-id apigateway-invoke --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn arn:aws:execute-api:$aws_region:$acc_id:$api_id/*/GET/madlibs
 else
+    
+    # Attach the jq layer to our function so that it's available as a tool
+    # This only runs after the first run, so that the Lambda is online already
+    aws lambda update-function-configuration --function-name $function_name --layers arn:aws:lambda:eu-west-1:488559761265:layer:jq:2 --region $aws_region
+
     # Get the /madlibs resource ID
     resource_id=$(aws apigateway get-resources --rest-api-id $api_id --query "items[?path=='/madlibs'].id" --output text)
     
